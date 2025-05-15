@@ -8,13 +8,13 @@
         "start": "node app.js"
     },
     "dependencies": {
+        "cors": "^2.8.5",
         "express": "^4.17.1",
+        "jest": "^27.5.1",
         "sequelize": "^6.12.0",
         "sqlite3": "^5.0.2",
-        "supertest": "^6.3.2",
-        "jest": "^27.5.1"
+        "supertest": "^6.3.2"
     },
-    "devDependencies": {},
     "author": "Alisa Ermel",
     "license": "ISC"
 }

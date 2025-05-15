@@ -1,12 +1,42 @@
 const request = require('supertest');
 const app = require('../app');
-const sequelize = require('../db');
-
-beforeAll(async () => {
-    await sequelize.sync({ force: true });
-});
+const { Ticket } = require('../models');
 
 describe('Ticket API Endpoints', () => {
+
+    // Clear the database before each test and create sample tickets
+    beforeEach(async () => {
+        await Ticket.destroy({ where: {} }); // Clear the table
+
+        // Create tickets with different statuses for testing
+        await Ticket.bulkCreate([
+            {
+                id: 1,
+                subject: 'New Ticket',
+                description: 'In progress ticket',
+                status: 'В работе',
+                createdAt: new Date('2025-01-01'),
+                updatedAt: new Date()
+            },
+            {
+                id: 2,
+                subject: 'Ticket 2',
+                description: 'Another in progress ticket',
+                status: 'В работе',
+                createdAt: new Date('2025-02-01'),
+                updatedAt: new Date()
+            },
+            {
+                id: 3,
+                subject: 'Ticket 3',
+                description: 'New ticket',
+                status: 'Новый',
+                createdAt: new Date('2025-03-01'),
+                updatedAt: new Date()
+            }
+        ]);
+    });
+
     it('should create a new ticket', async () => {
         const response = await request(app)
             .post('/api/tickets/create')
@@ -17,7 +47,9 @@ describe('Ticket API Endpoints', () => {
     });
 
     it('should take a ticket in progress', async () => {
-        const response = await request(app).put('/api/tickets/take/1');
+        const response = await request(app)
+            .put('/api/tickets/take/1');
+
         expect(response.statusCode).toBe(200);
         expect(response.body.status).toBe('В работе');
     });
@@ -41,24 +73,39 @@ describe('Ticket API Endpoints', () => {
     });
 
     it('should cancel all tickets in progress', async () => {
-        await request(app).post('/api/tickets/create').send({ subject: 'Another Ticket', description: 'Test' });
-        await request(app).put('/api/tickets/take/2');
-        const response = await request(app).put('/api/tickets/cancel-all-in-progress');
+        const cancelAllResponse = await request(app)
+            .post('/api/tickets/cancel-all-in-progress');
 
-        expect(response.statusCode).toBe(200);
+        expect(cancelAllResponse.statusCode).toBe(200);
+        expect(cancelAllResponse.body.length).toBeGreaterThan(0);
+        expect(cancelAllResponse.body[0].status).toBe('Отменено');
     });
 
     it('should filter tickets by date range', async () => {
-        // Создаем два обращения с разными датами
-        await request(app).post('/api/tickets/create').send({ subject: 'Old Ticket', description: 'Old ticket description' });
-        await request(app).post('/api/tickets/create').send({ subject: 'New Ticket', description: 'New ticket description' });
+        await request(app)
+            .post('/api/tickets/create')
+            .send({
+                subject: 'Old Ticket',
+                description: 'Old ticket description',
+                createdAt: '2025-01-01'
+            });
 
-        // Получаем все обращения в диапазоне
-        const response = await request(app).get('/api/tickets/list?startDate=2025-05-01&endDate=2025-05-31');
+        await request(app)
+            .post('/api/tickets/create')
+            .send({
+                subject: 'New Ticket',
+                description: 'New ticket description',
+                createdAt: '2025-12-01'
+            });
+
+        const response = await request(app)
+            .get('/api/tickets/list')
+            .query({ startDate: '2025-01-01', endDate: '2025-12-31' });
 
         expect(response.statusCode).toBe(200);
-        expect(response.body.length).toBeGreaterThanOrEqual(1);
-        expect(response.body.some(ticket => ticket.subject === 'New Ticket')).toBe(true);
+        expect(response.body.length).toBe(5);
+        expect(response.body[0].subject).toBe('New Ticket');
+        expect(response.body[1].subject).toBe('Old Ticket');
     });
 });
 ""
